@@ -2,6 +2,10 @@
 
 MIDI controller over UDP network using AtomVM on ESP32-C3. This project is tested with this board ESP32-C3 from SuperMini.
 
+## YouTube Demo
+
+[Controlling Arturia Pigments](https://www.youtube.com/shorts/djaUUPquI_E)
+
 ## Features for proof-of-concept
 
 - Sends MIDI 1.0 messages (random note On/Off) over UDP
@@ -41,7 +45,7 @@ mix atomvm.esp32.flash --port /dev/tty.usbmodem1101 # Adjust with your actual po
 
 ## Receiver
 
-Use the companion `desktop_receiver` project to receive UDP MIDI and forward to a virtual MIDI port (e.g., IAC Driver on macOS).
+Use the companion [desktop_receiver](https://github.com/nanassound/midimesh_desktop_receiver) project to receive UDP MIDI and forward to a virtual MIDI port (e.g., IAC Driver on macOS).
 
 ## License
 

@@ -25,3 +25,5 @@ midimesh_esp32-*.tar
 .vscode
 
 *.avm
+
+/lib/config.ex

@@ -1,6 +1,7 @@
 defmodule MidimeshEsp32 do
   @compile {:no_warn_undefined, [GPIO]}
-  @pin 8
+  @led_pin 8 # built-in LED
+  @knob_pin 0 # potentiometer
 
   # UDP Configuration
   @udp_target_ip {255, 255, 255, 255}  # Broadcast it!
@@ -8,20 +9,15 @@ defmodule MidimeshEsp32 do
 
   # MIDI Configuration
   @midi_channel 0  # Channel 1 (0-indexed)
-  @note_on 0x90    # Note On status byte
-  @note_off 0x80   # Note Off status byte
-  @min_note 48     # C3
-  @max_note 71     # B4
-  @note_duration 500   # How long to hold note (ms)
-  @note_interval 1000  # Time between notes (ms)
 
   def start() do
-    GPIO.set_pin_mode(@pin, :output)
+    GPIO.set_pin_mode(@led_pin, :output)
+    :esp_adc.start(@knob_pin)
 
     config = [
       sta: [
-        ssid: "", # SSID name
-        psk: "", # SSID password
+        ssid: MMConfig.ssid_name(), # SSID name
+        psk: MMConfig.ssid_password(), # SSID password
         connected: &connected/0,
         got_ip: &got_ip/1,
         disconnected: &disconnected/0,
@@ -32,26 +28,30 @@ defmodule MidimeshEsp32 do
     case :network.start(config) do
       {:ok, pid} ->
         IO.puts("Network started with pid: #{inspect(pid)}")
-
-        # Keep the main process alive
-        wait_forever()
       {:error, reason} ->
         IO.puts("Failed to start network: #{inspect(reason)}")
         {:error, reason}
     end
+
+    # Loop the main process forever
+    wait_forever()
   end
 
   defp connected do
     IO.puts("Connected to WiFi!")
   end
 
+  # Since this MIDI controller works exclusively via WiFi
+  # Then we will do everything after this device get IP address
   defp got_ip(ip_info) do
     IO.puts("Got IP: #{inspect(ip_info)}")
 
-    # Start LED blinking in a separate process
-    spawn(fn -> blinking_led(@pin, :low) end)
+    # Start LED blinking in a separate process.
+    # It acts as an indicator that this device successfully connected to the WiFi
+    # and get an IP address
+    spawn(fn -> blinking_led(@led_pin, :low) end)
 
-    # Start UDP sender in a separate process
+    # Start udp sender process
     spawn(fn -> start_udp_sender() end)
   end
 
@@ -68,6 +68,30 @@ defmodule MidimeshEsp32 do
   defp toggle(:high), do: :low
   defp toggle(:low), do: :high
 
+  defp read_knob(pin, socket, prev_cc_val) do
+    knob_val = Knob.read_analog(pin)
+    current_cc_val = case knob_val do
+      {:ok, {_, _, cc_val}} ->
+        # Only send if value changed
+        if cc_val != prev_cc_val do
+          # hardcoded CC number
+          # TODO: need to think how to make it configurable
+          cc_number = 16
+          status_byte = 0xB0 + @midi_channel
+          cc_data = <<status_byte, cc_number, cc_val>>
+          MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
+        end
+        cc_val
+
+      {:error, reason} ->
+        IO.puts("Error knob 1: #{inspect(reason)}")
+        prev_cc_val
+    end
+
+    Process.sleep(15)
+    read_knob(pin, socket, current_cc_val)
+  end
+
   defp wait_forever do
     Process.sleep(10000)
     wait_forever()
@@ -79,62 +103,12 @@ defmodule MidimeshEsp32 do
     case :gen_udp.open(0) do
       {:ok, socket} ->
         IO.puts("UDP socket opened successfully")
-        udp_send_loop(socket, 0)
+
+        # Reading the knob in a separate process
+        spawn(fn -> read_knob(@knob_pin, socket, nil) end)
+
       {:error, reason} ->
         IO.puts("Failed to open UDP socket: #{inspect(reason)}")
     end
-  end
-
-  defp udp_send_loop(socket, counter) do
-    # Generate a pseudo-random note based on counter
-    note = get_note(counter)
-    velocity = get_velocity(counter)
-
-    # Send Note On
-    note_on_msg = create_note_on(note, velocity)
-    send_midi(socket, note_on_msg)
-    IO.puts("Note On: #{note} vel: #{velocity}")
-
-    # Hold the note
-    Process.sleep(@note_duration)
-
-    # Send Note Off
-    note_off_msg = create_note_off(note)
-    send_midi(socket, note_off_msg)
-    IO.puts("Note Off: #{note}")
-
-    # Wait before next note
-    Process.sleep(@note_interval)
-    udp_send_loop(socket, counter + 1)
-  end
-
-  defp send_midi(socket, data) do
-    case :gen_udp.send(socket, @udp_target_ip, @udp_target_port, data) do
-      :ok -> :ok
-      {:error, reason} ->
-        IO.puts("Failed to send MIDI: #{inspect(reason)}")
-    end
-  end
-
-  # MIDI Message Generators
-  defp create_note_on(note, velocity) do
-    status = @note_on + @midi_channel
-    <<status, note, velocity>>
-  end
-
-  defp create_note_off(note) do
-    status = @note_off + @midi_channel
-    <<status, note, 0>>
-  end
-
-  # Pseudo-random note selection (since :rand unavailable)
-  defp get_note(counter) do
-    range = @max_note - @min_note + 1
-    @min_note + rem(counter * 7, range)
-  end
-
-  # Pseudo-random velocity (64-127)
-  defp get_velocity(counter) do
-    64 + rem(counter * 13, 64)
   end
 end

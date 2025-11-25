@@ -10,7 +10,7 @@ defmodule MidimeshEsp32.MixProject do
       deps: deps(),
       atomvm: [
         start: MidimeshEsp32,
-        flash_offset: 0x250000
+        flash_offset: 0x210000
       ]
     ]
   end

@@ -7,6 +7,21 @@ defmodule Knob do
   """
 
   @doc """
+  Activate multiple knobs based on the configuration.
+  """
+  def activate_knobs(_pins, 0), do: :ok
+  def activate_knobs(pins, number_of_knobs) when number_of_knobs > 0 do
+    current_knob_index = number_of_knobs - 1
+    knob_pin = elem(pins, current_knob_index)
+
+    # Initialize the knob pin
+    :esp_adc.start(knob_pin)
+
+    # Loop for the next knob
+    activate_knobs(pins, current_knob_index)
+  end
+
+  @doc """
   Reading the value from an analog potentiometer.
   """
   def read_analog(pin) do

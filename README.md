@@ -8,7 +8,8 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 
 ## Features
 
-- Reads analog potentiometer values and sends MIDI CC (Control Change) messages over UDP
+- Supports multiple analog potentiometers with concurrent processing (default: 2 knobs)
+- Sends MIDI CC (Control Change) messages over UDP
 - Modular architecture with separate modules for Knob, MIDI operations, and Config
 - LED indicator for WiFi connection status
 - Runs on ESP32-C3 with AtomVM
@@ -42,7 +43,9 @@ esptool.py --chip auto --port /dev/tty.usbmodem1101 --baud 921600 \
 
 ## Hardware Setup
 
-- **Potentiometer**: Connect a potentiometer (tested with B10K) to GPIO 0
+- **Potentiometers**: Connect analog potentiometers (tested with B10K) to:
+  - Knob 1: GPIO 0
+  - Knob 2: GPIO 1
 - **LED**: Status LED on GPIO 8 (blinks when connected to WiFi)
 
 ## Configuration
@@ -65,19 +68,26 @@ end
 Edit `lib/midimesh_esp32.ex`:
 
 ```elixir
-# Hardware pins
-@knob_pin 0          # GPIO pin for potentiometer
+# Hardware pins - Add/remove pins as tuples to support more/fewer knobs
+@knob_pins {0, 1}    # GPIO pins for potentiometers (Knob 1, Knob 2, ...)
+
+# LED indicator
 @led_pin 8           # GPIO pin for status LED
 
 # Network
 @udp_target_ip {255, 255, 255, 255}  # Broadcast or specific IP
 @udp_target_port 4000
 
-# MIDI
-@midi_channel 0      # Channel 0 in code means channel 1 in DAW/hardware (n+1)
+# MIDI - CC numbers map 1:1 with knob pins by position
+@knob_midi_cc_number {16, 17}  # CC numbers for each knob
+@midi_channel 0                # Channel 0 in code = channel 1 in DAW (n+1)
 ```
 
-**Note**: CC number is currently hardcoded to 16 in the `read_knob/3` function.
+**Adding more knobs**: Simply extend both tuples. For example, to add a 3rd knob:
+```elixir
+@knob_pins {0, 1, 2}
+@knob_midi_cc_number {16, 17, 18}
+```
 
 ## Build & Flash
 

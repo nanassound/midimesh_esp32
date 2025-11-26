@@ -1,23 +1,34 @@
 defmodule MidimeshEsp32 do
   @compile {:no_warn_undefined, [GPIO]}
-  @led_pin 8 # built-in LED
-  @knob_pin 0 # potentiometer
+  # built-in LED
+  @led_pin 8
+
+  # knob analog pin configuration
+  @knob_pins {0, 1}
+  # knob midi CC number in the same order as the pin
+  @knob_midi_cc_number {16, 17}
 
   # UDP Configuration
-  @udp_target_ip {255, 255, 255, 255}  # Broadcast it!
+  # Broadcast it!
+  @udp_target_ip {255, 255, 255, 255}
   @udp_target_port 4000
 
   # MIDI Configuration
-  @midi_channel 0  # Channel 1 (0-indexed)
+  # Channel 1 (0-indexed)
+  @midi_channel 0
 
   def start() do
     GPIO.set_pin_mode(@led_pin, :output)
-    :esp_adc.start(@knob_pin)
+
+    number_of_knobs = tuple_size(@knob_pins)
+    Knob.activate_knobs(@knob_pins, number_of_knobs)
 
     config = [
       sta: [
-        ssid: MMConfig.ssid_name(), # SSID name
-        psk: MMConfig.ssid_password(), # SSID password
+        # SSID name
+        ssid: MMConfig.ssid_name(),
+        # SSID password
+        psk: MMConfig.ssid_password(),
         connected: &connected/0,
         got_ip: &got_ip/1,
         disconnected: &disconnected/0,
@@ -28,6 +39,7 @@ defmodule MidimeshEsp32 do
     case :network.start(config) do
       {:ok, pid} ->
         IO.puts("Network started with pid: #{inspect(pid)}")
+
       {:error, reason} ->
         IO.puts("Failed to start network: #{inspect(reason)}")
         {:error, reason}
@@ -68,28 +80,41 @@ defmodule MidimeshEsp32 do
   defp toggle(:high), do: :low
   defp toggle(:low), do: :high
 
-  defp read_knob(pin, socket, prev_cc_val) do
-    knob_val = Knob.read_analog(pin)
-    current_cc_val = case knob_val do
-      {:ok, {_, _, cc_val}} ->
-        # Only send if value changed
-        if cc_val != prev_cc_val do
-          # hardcoded CC number
-          # TODO: need to think how to make it configurable
-          cc_number = 16
-          status_byte = 0xB0 + @midi_channel
-          cc_data = <<status_byte, cc_number, cc_val>>
-          MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
-        end
-        cc_val
+  defp spawn_knobs_reading_process(_pins, 0, nil), do: :ok
 
-      {:error, reason} ->
-        IO.puts("Error knob 1: #{inspect(reason)}")
-        prev_cc_val
-    end
+  defp spawn_knobs_reading_process(pins, number_of_knobs, socket) when number_of_knobs > 0 do
+    current_knob_index = number_of_knobs - 1
+    knob_pin = elem(pins, current_knob_index)
+    cc_number = elem(@knob_midi_cc_number, current_knob_index)
+
+    spawn(fn -> read_knob(knob_pin, socket, nil, cc_number) end)
+
+    # Repeat until all knobs get a process
+    spawn_knobs_reading_process(pins, number_of_knobs - 1, socket)
+  end
+
+  defp read_knob(pin, socket, prev_cc_val, cc_number) do
+    knob_val = Knob.read_analog(pin)
+
+    current_cc_val =
+      case knob_val do
+        {:ok, {_, _, cc_val}} ->
+          # Only send if value changed
+          if cc_val != prev_cc_val do
+            status_byte = 0xB0 + @midi_channel
+            cc_data = <<status_byte, cc_number, cc_val>>
+            MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
+          end
+
+          cc_val
+
+        {:error, reason} ->
+          IO.puts("Error knob: #{inspect(reason)}")
+          prev_cc_val
+      end
 
     Process.sleep(15)
-    read_knob(pin, socket, current_cc_val)
+    read_knob(pin, socket, current_cc_val, cc_number)
   end
 
   defp wait_forever do
@@ -100,12 +125,13 @@ defmodule MidimeshEsp32 do
   # UDP Sender Functions
   defp start_udp_sender do
     IO.puts("Starting UDP sender...")
+
     case :gen_udp.open(0) do
       {:ok, socket} ->
         IO.puts("UDP socket opened successfully")
 
-        # Reading the knob in a separate process
-        spawn(fn -> read_knob(@knob_pin, socket, nil) end)
+        number_of_knobs = tuple_size(@knob_pins)
+        spawn_knobs_reading_process(@knob_pins, number_of_knobs, socket)
 
       {:error, reason} ->
         IO.puts("Failed to open UDP socket: #{inspect(reason)}")

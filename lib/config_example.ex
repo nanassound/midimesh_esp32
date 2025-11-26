@@ -7,6 +7,13 @@ defmodule ConfigExample do
     - rename the module name into MMConfig
   """
 
+  @doc """
+  Your WiFi SSID name.
+  """
   def ssid_name(), do: "" # your ssid name
+
+  @doc """
+  Your WiFi SSID password.
+  """
   def ssid_password(), do: "" # your ssid password
 end

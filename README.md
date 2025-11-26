@@ -6,6 +6,8 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 
 [Controlling Arturia Pigments](https://www.youtube.com/shorts/djaUUPquI_E)
 
+[Knob Control in Ableton Live](https://www.youtube.com/shorts/GX_Sy0ogvio)
+
 ## Features
 
 - Supports multiple analog potentiometers with concurrent processing (default: 2 knobs)

@@ -8,7 +8,8 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 
 ## Features
 
-- Reads analog potentiometer values and sends MIDI CC (Control Change) messages over UDP
+- Supports multiple analog potentiometers with concurrent processing (default: 2 knobs)
+- Sends MIDI CC (Control Change) messages over UDP
 - Modular architecture with separate modules for Knob, MIDI operations, and Config
 - LED indicator for WiFi connection status
 - Runs on ESP32-C3 with AtomVM
@@ -16,13 +17,35 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 
 ## Requirements
 
-- ESP32 (tested on ESP32-C3)
-- [AtomVM](https://atomvm.org) flashed on the device
+- ESP32-C3 board (tested with SuperMini)
+- [AtomVM v0.6.6](https://github.com/atomvm/AtomVM/releases/tag/v0.6.6) flashed on the device
 - Elixir with [ExAtomVM](https://github.com/atomvm/ExAtomVM)
+- esptool.py for flashing
+
+## Installing AtomVM on ESP32-C3
+
+Download the AtomVM v0.6.6 image for ESP32-C3:
+
+```bash
+curl -L https://github.com/atomvm/AtomVM/releases/download/v0.6.6/AtomVM-esp32c3-v0.6.6.img -o AtomVM-esp32c3-v0.6.6.img
+```
+
+Flash AtomVM to your ESP32-C3 (adjust `--port` to match your device):
+
+```bash
+esptool.py --chip auto --port /dev/tty.usbmodem1101 --baud 921600 \
+  --before default_reset --after hard_reset write_flash -u \
+  --flash_mode dio --flash_freq 40m --flash_size detect \
+  0x0 AtomVM-esp32c3-v0.6.6.img
+```
+
+**Important for ESP32-C3**: The flash offset in `mix.exs` must be set to `0x210000` to match the AtomVM partition layout.
 
 ## Hardware Setup
 
-- **Potentiometer**: Connect a potentiometer (tested with B10K) to GPIO 0
+- **Potentiometers**: Connect analog potentiometers (tested with B10K) to:
+  - Knob 1: GPIO 0
+  - Knob 2: GPIO 1
 - **LED**: Status LED on GPIO 8 (blinks when connected to WiFi)
 
 ## Configuration
@@ -45,19 +68,26 @@ end
 Edit `lib/midimesh_esp32.ex`:
 
 ```elixir
-# Hardware pins
-@knob_pin 0          # GPIO pin for potentiometer
+# Hardware pins - Add/remove pins as tuples to support more/fewer knobs
+@knob_pins {0, 1}    # GPIO pins for potentiometers (Knob 1, Knob 2, ...)
+
+# LED indicator
 @led_pin 8           # GPIO pin for status LED
 
 # Network
 @udp_target_ip {255, 255, 255, 255}  # Broadcast or specific IP
 @udp_target_port 4000
 
-# MIDI
-@midi_channel 0      # Channel 0 in code means channel 1 in DAW/hardware (n+1)
+# MIDI - CC numbers map 1:1 with knob pins by position
+@knob_midi_cc_number {16, 17}  # CC numbers for each knob
+@midi_channel 0                # Channel 0 in code = channel 1 in DAW (n+1)
 ```
 
-**Note**: CC number is currently hardcoded to 16 in the `read_knob/3` function.
+**Adding more knobs**: Simply extend both tuples. For example, to add a 3rd knob:
+```elixir
+@knob_pins {0, 1, 2}
+@knob_midi_cc_number {16, 17, 18}
+```
 
 ## Build & Flash
 

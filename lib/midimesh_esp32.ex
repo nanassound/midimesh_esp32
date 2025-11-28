@@ -1,12 +1,15 @@
 defmodule MidimeshEsp32 do
   @compile {:no_warn_undefined, [GPIO]}
-  # built-in LED
-  @led_pin 8
+  # External LED (pin 8 used by I2C SDA)
+  @led_pin 10
 
-  # knob analog pin configuration
-  @knob_pins {0, 1}
-  # knob midi CC number in the same order as the pin
-  @knob_midi_cc_number {16, 17}
+  # KNOBS DISABLED - ADC conflicts with I2C on ESP32-C3
+  # Use separate firmware for knob-based controllers
+  # @knob_pins {0, 1}
+  # @knob_midi_cc_number {16, 17}
+
+  # Trill Bar I2C pins {sda, scl}
+  @i2c_pins {8, 9}
 
   # UDP Configuration
   # Broadcast it!
@@ -20,8 +23,9 @@ defmodule MidimeshEsp32 do
   def start() do
     GPIO.set_pin_mode(@led_pin, :output)
 
-    number_of_knobs = tuple_size(@knob_pins)
-    Knob.activate_knobs(@knob_pins, number_of_knobs)
+    # KNOBS DISABLED - Conflicts with I2C
+    # number_of_knobs = tuple_size(@knob_pins)
+    # Knob.activate_knobs(@knob_pins, number_of_knobs)
 
     config = [
       sta: [
@@ -57,6 +61,17 @@ defmodule MidimeshEsp32 do
   # Then we will do everything after this device get IP address
   defp got_ip(ip_info) do
     IO.puts("Got IP: #{inspect(ip_info)}")
+
+    # Initialize Trill Bar sensor after WiFi is up
+    IO.puts("Initializing Trill Bar I2C...")
+    case BelaTrill.begin(@i2c_pins) do
+      {:ok, i2c} ->
+        IO.puts("Trill Bar I2C initialized successfully")
+        # Start Trill reading process
+        spawn(fn -> read_trill_loop(i2c) end)
+      {:error, reason} ->
+        IO.puts("Trill I2C failed: #{inspect(reason)}")
+    end
 
     # Start LED blinking in a separate process.
     # It acts as an indicator that this device successfully connected to the WiFi
@@ -127,14 +142,40 @@ defmodule MidimeshEsp32 do
     IO.puts("Starting UDP sender...")
 
     case :gen_udp.open(0) do
-      {:ok, socket} ->
+      {:ok, _socket} ->
         IO.puts("UDP socket opened successfully")
+        IO.puts("Knob reading disabled - using Trill Bar only")
 
-        number_of_knobs = tuple_size(@knob_pins)
-        spawn_knobs_reading_process(@knob_pins, number_of_knobs, socket)
+        # KNOBS DISABLED - Conflicts with I2C
+        # number_of_knobs = tuple_size(@knob_pins)
+        # spawn_knobs_reading_process(@knob_pins, number_of_knobs, socket)
 
       {:error, reason} ->
         IO.puts("Failed to open UDP socket: #{inspect(reason)}")
     end
+  end
+
+  # Trill Bar Reading Functions
+  defp read_trill_loop(i2c) do
+    case BelaTrill.read_touches(i2c) do
+      {:ok, %{num_touches: 0}} ->
+        # No touch, don't print anything
+        :ok
+
+      {:ok, %{num_touches: num, touches: touches}} ->
+        IO.puts("Touches: #{num}")
+        Enum.each(touches, fn touch ->
+          # Format position to 3 decimal places
+          pos_str = :erlang.float_to_binary(touch.position, [{:decimals, 3}])
+          IO.puts("  Pos: #{pos_str} (raw: #{touch.position_raw}), Size: #{touch.size}")
+        end)
+
+      {:error, reason} ->
+        IO.puts("Trill read error: #{inspect(reason)}")
+    end
+
+    # Read at ~10Hz (100ms delay)
+    Process.sleep(100)
+    read_trill_loop(i2c)
   end
 end

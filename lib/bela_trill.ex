@@ -27,15 +27,18 @@ defmodule BelaTrill do
   @cmd_mode 0x01
   @cmd_scan_settings 0x02
   @cmd_baseline_update 0x03
+  @cmd_prescaler 0x04
 
   # Modes
   @mode_centroid 0x00
 
   # Scan settings
   @speed_fast 1
+  @resolution_12_bit 12
+  @prescaler_value 4  # Higher value = less sensitive to noise (range: 1-8)
 
   # Trill Bar specific
-  @max_position_value 3584
+  @max_position_value 3200
   @max_touches 5
 
   @doc """
@@ -113,15 +116,30 @@ defmodule BelaTrill do
         IO.puts("BelaTrill: Waiting for mode change (200ms)...")
         Process.sleep(200)
 
-        # Update baseline multiple times to ensure it takes
-        IO.puts("BelaTrill: Step 2 - Updating baseline (3 times)")
-        update_baseline(i2c)
-        Process.sleep(100)
-        update_baseline(i2c)
-        Process.sleep(100)
-        update_baseline(i2c)
-        Process.sleep(200)
-        IO.puts("BelaTrill: Baseline calibration complete")
+        # Set scan settings for 12-bit resolution
+        IO.puts("BelaTrill: Step 2 - Setting scan settings (speed=#{@speed_fast}, resolution=#{@resolution_12_bit} bits)")
+        case set_scan_settings(i2c, @speed_fast, @resolution_12_bit) do
+          :ok ->
+            IO.puts("BelaTrill: Scan settings configured")
+            Process.sleep(100)
+          error ->
+            IO.puts("BelaTrill: Scan settings failed: #{inspect(error)}")
+        end
+
+        # Set prescaler to reduce noise sensitivity
+        IO.puts("BelaTrill: Step 2b - Setting prescaler to #{@prescaler_value}")
+        case set_prescaler(i2c, @prescaler_value) do
+          :ok ->
+            IO.puts("BelaTrill: Prescaler configured")
+            Process.sleep(100)
+          error ->
+            IO.puts("BelaTrill: Prescaler failed: #{inspect(error)}")
+        end
+
+        # Skip baseline update - let sensor use factory defaults
+        IO.puts("BelaTrill: Step 3 - Skipping baseline update (using factory defaults)")
+        Process.sleep(500)  # Wait for sensor to stabilize
+        IO.puts("BelaTrill: Sensor initialization complete")
         :ok
       error ->
         IO.puts("BelaTrill: Mode setting failed: #{inspect(error)}")
@@ -142,8 +160,15 @@ defmodule BelaTrill do
   end
 
   # Set scan settings (speed and resolution)
-  defp set_scan_settings(i2c, speed) do
-    result = :i2c.write_bytes(i2c, @i2c_address, <<@cmd_scan_settings, speed>>)
+  defp set_scan_settings(i2c, speed, resolution) do
+    result = :i2c.write_bytes(i2c, @i2c_address, @reg_command, <<@cmd_scan_settings, speed, resolution>>)
+    Process.sleep(30)
+    result
+  end
+
+  # Set prescaler (noise threshold)
+  defp set_prescaler(i2c, prescaler) do
+    result = :i2c.write_bytes(i2c, @i2c_address, @reg_command, <<@cmd_prescaler, prescaler>>)
     Process.sleep(30)
     result
   end
@@ -214,8 +239,8 @@ defmodule BelaTrill do
       # Valid touch must have:
       # 1. Position not 0xFFFF (65535) - padding/invalid
       # 2. Size not 0xFFFF (65535) - padding/invalid
-      # 3. Size > 0 and < 60000 (actual touch pressure is typically 50-500)
-      touch.position_raw != 65535 and touch.size != 65535 and touch.size > 0 and touch.size < 60000
+      # 3. Size > 0 and <= 4566 (Trill Bar spec max size value)
+      touch.position_raw != 65535 and touch.size != 65535 and touch.size > 0 and touch.size <= 4566
     end)
 
     {:ok, %{num_touches: length(valid_touches), touches: valid_touches}}

@@ -26,22 +26,10 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 
 ## Installing AtomVM on ESP32-C3
 
-Download the AtomVM v0.6.6 image for ESP32-C3:
+1. Run `mix deps.get` to get all dependencies.
+2. Run `mix atomvm.esp32.install` to install and flash the latest stable releases of AtomVM.
 
-```bash
-curl -L https://github.com/atomvm/AtomVM/releases/download/v0.6.6/AtomVM-esp32c3-v0.6.6.img -o AtomVM-esp32c3-v0.6.6.img
-```
-
-Flash AtomVM to your ESP32-C3 (adjust `--port` to match your device):
-
-```bash
-esptool.py --chip auto --port /dev/tty.usbmodem1101 --baud 921600 \
-  --before default_reset --after hard_reset write_flash -u \
-  --flash_mode dio --flash_freq 40m --flash_size detect \
-  0x0 AtomVM-esp32c3-v0.6.6.img
-```
-
-**Important for ESP32-C3**: The flash offset in `mix.exs` must be set to `0x210000` to match the AtomVM partition layout.
+**Important for ESP32-C3**: The flash offset in `mix.exs` must be set to `0x250000` to match the AtomVM partition layout.
 
 ## Hardware Setup
 
@@ -94,7 +82,6 @@ Edit `lib/midimesh_esp32.ex`:
 ## Build & Flash
 
 ```bash
-mix deps.get
 mix atomvm.packbeam
 mix atomvm.esp32.flash --port /dev/tty.usbmodem1101 # Adjust with your actual port
 ```

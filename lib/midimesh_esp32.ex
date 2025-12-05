@@ -118,8 +118,8 @@ defmodule MidimeshEsp32 do
   end
 
   defp wait_forever do
-    Process.sleep(10000)
-    wait_forever()
+    receive do
+    end
   end
 
   # UDP Sender Functions

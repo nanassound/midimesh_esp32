@@ -2,8 +2,6 @@
 
 This directory contains KiCad design files for various midiMESH controllers. Each controller is a Eurorack-compatible MIDI device that works with the midiMESH firmware.
 
----
-
 ## Available Controllers
 
 ### Slide & Twist
@@ -21,8 +19,7 @@ This directory contains KiCad design files for various midiMESH controllers. Eac
 - Pin headers for ESP32-C3 SuperMini
 
 **Power Requirements:**
-- +3.3V and +5V rails from Eurorack power
-- Compatible with standard Eurorack power distribution
++5V from USB-C, Eurorack power header (J2), or adding battery to the power connector (J1)
 
 **Design Files:**
 - Location: [`slide_and_twist/`](slide_and_twist/)
@@ -34,8 +31,6 @@ This directory contains KiCad design files for various midiMESH controllers. Eac
 
 **Last Updated:** 2025-12-06
 
----
-
 ## Design Notes
 
 All midiMESH controllers share common features:
@@ -44,8 +39,6 @@ All midiMESH controllers share common features:
 - Designed to work with the midiMESH firmware (see [`firmware/`](../firmware/))
 - Status LED for connection indication
 - Modular and expandable design
-
----
 
 ## Using the Design Files
 
@@ -63,8 +56,6 @@ The design files are ready for PCB manufacturing. You can:
 - Export pick-and-place files for assembly (if needed)
 
 **Note:** Assembly and manufacturing instructions are not provided. Users are expected to have basic PCB manufacturing and assembly knowledge.
-
----
 
 ## License
 

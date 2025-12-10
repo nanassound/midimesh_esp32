@@ -92,4 +92,4 @@ Use the companion [desktop_receiver](https://github.com/nanassound/midimesh_desk
 
 ## License
 
-[MIT](LICENSE.md)
+[Apache 2.0 license](LICENSE.md)

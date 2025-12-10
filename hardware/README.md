@@ -61,7 +61,7 @@ The design files are ready for PCB manufacturing. You can:
 
 All hardware designs in this directory are licensed under the **CERN Open Hardware License v2 - Weakly Reciprocal (CERN-OHL-W)**.
 
-Copyright 2025 Nanas Sound OÜ <asep@nanassound.com>
+Copyright 2025 Nanas Sound OÜ
 
 See [`LICENSE.md`](LICENSE.md) for full license text.
 

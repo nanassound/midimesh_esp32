@@ -90,15 +90,11 @@ This project is dual-licensed:
 
 The firmware (in [`firmware/`](firmware/)) is licensed under the **Apache 2.0 license**.
 
-Copyright 2025 Nanas Sound OÜ <asep@nanassound.com>
-
 See [`firmware/LICENSE.md`](firmware/LICENSE.md) for full license text.
 
 ### Hardware License
 
 The hardware design (in [`hardware/`](hardware/)) is licensed under the **CERN Open Hardware License v2 - Weakly Reciprocal (CERN-OHL-W)**.
-
-Copyright 2025 Nanas Sound OÜ <asep@nanassound.com>
 
 See [`hardware/LICENSE.md`](hardware/LICENSE.md) for full license text.
 

@@ -21,7 +21,9 @@ defmodule MidimeshEsp32.WiFi do
   @doc """
   Get the configuration for the device networking mode.
   """
-  def get_config(:sta_mode, opts \\ []) do
+  def get_config(mode, opts \\ [])
+
+  def get_config(:sta_mode, opts) do
     {:ok,
      [
        sta: [
@@ -41,6 +43,7 @@ defmodule MidimeshEsp32.WiFi do
     {:ok,
      [
        ap: [
+         ssid: "midiMESH-SlideAndTwist",
          ap_started: Keyword.get(opts, :ap_started, &ap_started/0),
          sta_connected: Keyword.get(opts, :sta_connected, &sta_connected/1),
          sta_ip_assigned: Keyword.get(opts, :sta_ip_assigned, &sta_ip_assigned/1),
@@ -49,7 +52,7 @@ defmodule MidimeshEsp32.WiFi do
      ]}
   end
 
-  def get_config(_, opts) do
+  def get_config(_, _opts) do
     {:error, "No configuration for this mode"}
   end
 

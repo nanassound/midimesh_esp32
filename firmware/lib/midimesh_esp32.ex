@@ -20,7 +20,7 @@ defmodule MidimeshEsp32 do
   @led_pin 8
 
   # Switch for selecting AP mode or STA mode
-  @switch_pin 10
+  @switch_pins {10}
 
   # knob analog pin configuration
   @knob_pins {0, 1, 2, 3, 4}
@@ -42,10 +42,29 @@ defmodule MidimeshEsp32 do
     number_of_knobs = tuple_size(@knob_pins)
     MidimeshEsp32.Knob.activate_knobs(@knob_pins, number_of_knobs)
 
-    {:ok, config} =
-      MidimeshEsp32.WiFi.get_config(:sta_mode,
-        got_ip: &got_ip/1
-      )
+    number_of_switches = tuple_size(@switch_pins)
+    MidimeshEsp32.Switch.activate_switches(@switch_pins, number_of_switches)
+
+    # Decide between AP mode or STA mode.
+    # When the switch is ON, it should become AP mode
+    config =
+      case MidimeshEsp32.Switch.read_state(elem(@switch_pins, 0)) do
+        :low ->
+          {:ok, config} =
+            MidimeshEsp32.WiFi.get_config(:ap_mode,
+              ap_started: &ap_started/0
+            )
+
+          config
+
+        :high ->
+          {:ok, config} =
+            MidimeshEsp32.WiFi.get_config(:sta_mode,
+              got_ip: &got_ip/1
+            )
+
+          config
+      end
 
     case :network.start(config) do
       {:ok, network_pid} ->
@@ -63,7 +82,8 @@ defmodule MidimeshEsp32 do
   end
 
   # Since this MIDI controller works exclusively via WiFi
-  # Then we will do everything after this device get IP address
+  # Then we will do everything after this device get IP address.
+  # This is for STA mode
   defp got_ip(ip_info) do
     IO.puts("Got IP: #{inspect(ip_info)}")
 
@@ -74,6 +94,17 @@ defmodule MidimeshEsp32 do
 
     # Start udp sender process
     spawn(fn -> start_udp_sender() end)
+  end
+
+  # If the device in AP mode, we will start from here
+  defp ap_started do
+    # In AP mode, the led will constantly ON to give visual differentiation
+    GPIO.digital_write(@led_pin, :low)
+
+    # Start udp sender process
+    spawn(fn -> start_udp_sender() end)
+
+    IO.puts("midiMESH is in AP mode")
   end
 
   defp blinking_led(pin, level) do

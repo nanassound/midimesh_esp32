@@ -15,13 +15,17 @@
 # limitations under the License.
 defmodule MidimeshEsp32 do
   @compile {:no_warn_undefined, [GPIO]}
+
   # built-in LED
   @led_pin 8
 
+  # Switch for selecting AP mode or STA mode
+  @switch_pin 10
+
   # knob analog pin configuration
-  @knob_pins {0, 1}
+  @knob_pins {0, 1, 2, 3, 4}
   # knob midi CC number in the same order as the pin
-  @knob_midi_cc_number {16, 17}
+  @knob_midi_cc_number {75, 76, 77, 78, 79}
 
   # UDP Configuration
   # Broadcast it!
@@ -36,24 +40,18 @@ defmodule MidimeshEsp32 do
     GPIO.set_pin_mode(@led_pin, :output)
 
     number_of_knobs = tuple_size(@knob_pins)
-    Knob.activate_knobs(@knob_pins, number_of_knobs)
+    MidimeshEsp32.Knob.activate_knobs(@knob_pins, number_of_knobs)
 
-    config = [
-      sta: [
-        # SSID name
-        ssid: MMConfig.ssid_name(),
-        # SSID password
-        psk: MMConfig.ssid_password(),
-        connected: &connected/0,
-        got_ip: &got_ip/1,
-        disconnected: &disconnected/0,
-        dhcp_hostname: "midimesh_esp32"
-      ]
-    ]
+    {:ok, config} =
+      MidimeshEsp32.WiFi.get_config(:sta_mode,
+        got_ip: &got_ip/1
+      )
 
     case :network.start(config) do
-      {:ok, pid} ->
-        IO.puts("Network started with pid: #{inspect(pid)}")
+      {:ok, network_pid} ->
+        # Wait the device to settle down with the network initialization
+        Process.sleep(5000)
+        IO.puts("Network PID: #{inspect(network_pid)}")
 
       {:error, reason} ->
         IO.puts("Failed to start network: #{inspect(reason)}")
@@ -62,10 +60,6 @@ defmodule MidimeshEsp32 do
 
     # Loop the main process forever
     wait_forever()
-  end
-
-  defp connected do
-    IO.puts("Connected to WiFi!")
   end
 
   # Since this MIDI controller works exclusively via WiFi
@@ -82,10 +76,6 @@ defmodule MidimeshEsp32 do
     spawn(fn -> start_udp_sender() end)
   end
 
-  defp disconnected do
-    IO.puts("Disconnected from WiFi")
-  end
-
   defp blinking_led(pin, level) do
     GPIO.digital_write(pin, level)
     Process.sleep(1000)
@@ -95,7 +85,7 @@ defmodule MidimeshEsp32 do
   defp toggle(:high), do: :low
   defp toggle(:low), do: :high
 
-  defp spawn_knobs_reading_process(_pins, 0, nil), do: :ok
+  defp spawn_knobs_reading_process(_pins, 0, _socket), do: :ok
 
   defp spawn_knobs_reading_process(pins, number_of_knobs, socket) when number_of_knobs > 0 do
     current_knob_index = number_of_knobs - 1
@@ -109,7 +99,7 @@ defmodule MidimeshEsp32 do
   end
 
   defp read_knob(pin, socket, prev_cc_val, cc_number) do
-    knob_val = Knob.read_analog(pin)
+    knob_val = MidimeshEsp32.Knob.read_analog(pin)
 
     current_cc_val =
       case knob_val do
@@ -118,7 +108,7 @@ defmodule MidimeshEsp32 do
           if cc_val != prev_cc_val do
             status_byte = 0xB0 + @midi_channel
             cc_data = <<status_byte, cc_number, cc_val>>
-            MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
+            MidimeshEsp32.MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
           end
 
           cc_val
@@ -128,7 +118,7 @@ defmodule MidimeshEsp32 do
           prev_cc_val
       end
 
-    Process.sleep(15)
+    Process.sleep(50)
     read_knob(pin, socket, current_cc_val, cc_number)
   end
 
@@ -146,6 +136,7 @@ defmodule MidimeshEsp32 do
         IO.puts("UDP socket opened successfully")
 
         number_of_knobs = tuple_size(@knob_pins)
+
         spawn_knobs_reading_process(@knob_pins, number_of_knobs, socket)
 
       {:error, reason} ->

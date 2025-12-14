@@ -103,8 +103,6 @@ defmodule MidimeshEsp32 do
 
     # Start udp sender process
     spawn(fn -> start_udp_sender() end)
-
-    IO.puts("midiMESH is in AP mode")
   end
 
   defp blinking_led(pin, level) do

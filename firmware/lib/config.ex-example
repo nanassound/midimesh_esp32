@@ -13,22 +13,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-defmodule ConfigExample do
+defmodule MidimeshEsp32.Config do
   @moduledoc """
   Global configuration files for the firmware.
 
   Note:
-    - rename the file into config.ex
-    - rename the module name into MMConfig
+    rename the file into config.ex
   """
 
   @doc """
   Your WiFi SSID name.
   """
-  def ssid_name(), do: "" # your ssid name
+  # your ssid name
+  def ssid_name(), do: ""
 
   @doc """
   Your WiFi SSID password.
   """
-  def ssid_password(), do: "" # your ssid password
+  # your ssid password
+  def ssid_password(), do: ""
 end

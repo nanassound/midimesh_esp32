@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-defmodule Knob do
+defmodule MidimeshEsp32.Knob do
   @moduledoc """
   Knob is a module to abstract the reading of knob component attached to the microcontroller.
   It can be an analog potentiometer or rotary encoder.
@@ -25,6 +25,7 @@ defmodule Knob do
   Activate multiple knobs based on the configuration.
   """
   def activate_knobs(_pins, 0), do: :ok
+
   def activate_knobs(pins, number_of_knobs) when number_of_knobs > 0 do
     current_knob_index = number_of_knobs - 1
     knob_pin = elem(pins, current_knob_index)
@@ -47,6 +48,7 @@ defmodule Knob do
 
         # Adding midi value mapping to the result
         {:ok, {raw_value, voltage, midi_value}}
+
       {:error, reason} ->
         {:error, reason}
     end

@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-defmodule MidiOps do
+defmodule MidimeshEsp32.MidiOps do
   @moduledoc """
   Various functions related to MIDI.
   """
@@ -23,7 +23,9 @@ defmodule MidiOps do
   """
   def send_midi(socket, data, udp_target_ip, udp_target_port) do
     case :gen_udp.send(socket, udp_target_ip, udp_target_port, data) do
-      :ok -> :ok
+      :ok ->
+        :ok
+
       {:error, reason} ->
         IO.puts("Failed to send MIDI: #{inspect(reason)}")
     end

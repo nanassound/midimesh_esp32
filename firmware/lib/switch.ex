@@ -22,9 +22,14 @@ defmodule MidimeshEsp32.Switch do
   Activate multiple switches based on the configuration.
   This function supports SPDT or SPST switch.
   """
-  def activate_switches(_pin, 0), do: :ok
+  def activate_switches(pins) do
+    number_of_switches = tuple_size(pins)
+    do_activate_switches(pins, number_of_switches)
+  end
 
-  def activate_switches(pins, number_of_pins) when number_of_pins > 0 do
+  def do_activate_switches(_pins, 0), do: :ok
+
+  def do_activate_switches(pins, number_of_pins) when number_of_pins > 0 do
     current_switch_index = number_of_pins - 1
     switch_pin = elem(pins, current_switch_index)
 
@@ -36,7 +41,7 @@ defmodule MidimeshEsp32.Switch do
     GPIO.set_pin_pull(switch_pin, :up)
 
     # Loop for the next knob
-    activate_switches(pins, current_switch_index)
+    do_activate_switches(pins, current_switch_index)
   end
 
   def read_state(pin) do

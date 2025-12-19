@@ -23,37 +23,57 @@ defmodule MidimeshEsp32.WiFi do
   """
   def get_config(mode, opts \\ [])
 
-  def get_config(:sta_mode, opts) do
+  def get_config(:sta_mode, _opts) do
     {:ok,
      [
-       sta: [
-         # SSID name
-         ssid: MidimeshEsp32.Config.ssid_name(),
-         # SSID password
-         psk: MidimeshEsp32.Config.ssid_password(),
-         connected: Keyword.get(opts, :connected, &connected/0),
-         got_ip: Keyword.get(opts, :got_ip, &got_ip/1),
-         disconnected: Keyword.get(opts, :disconnected, &disconnected/0),
-         dhcp_hostname: "midimesh_esp32"
-       ]
+       # SSID name
+       ssid: MidimeshEsp32.Config.ssid_name(),
+       # SSID password
+       psk: MidimeshEsp32.Config.ssid_password()
      ]}
   end
 
-  def get_config(:ap_mode, opts) do
+  def get_config(:ap_mode, _opts) do
     {:ok,
      [
-       ap: [
-         ssid: "midiMESH-SlideAndTwist",
-         ap_started: Keyword.get(opts, :ap_started, &ap_started/0),
-         sta_connected: Keyword.get(opts, :sta_connected, &sta_connected/1),
-         sta_ip_assigned: Keyword.get(opts, :sta_ip_assigned, &sta_ip_assigned/1),
-         sta_disconnected: Keyword.get(opts, :sta_disconnected, &sta_disconnected/1)
-       ]
+       ssid: "midiMESH-SlideAndTwist"
      ]}
   end
 
   def get_config(_, _opts) do
     {:error, "No configuration for this mode"}
+  end
+
+  @doc """
+  Start and wait for the specific network mode.
+  Valid option is :sta_mode (station) and :ap_mode (access point).
+  """
+  def wait_for_mode(:sta_mode, sta_config, callback_fn) do
+    case :network.wait_for_sta(sta_config, 15000) do
+      {:ok, ip_info} ->
+        IO.puts("midiMESH STA mode got IP: #{inspect(ip_info)}")
+
+        # Send the ip info to the callback function
+        callback_fn.(ip_info)
+
+        {:ok, ip_info}
+
+      {:error, reason} ->
+        IO.puts("Failed to start network: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  def wait_for_mode(:ap_mode, ap_config, callback_fn) do
+    case :network.wait_for_ap(ap_config, 15000) do
+      :ok ->
+        callback_fn.()
+        :ok
+
+      {:error, reason} ->
+        IO.puts("Failed to start network: #{inspect(reason)}")
+        {:error, reason}
+    end
   end
 
   defp connected do
@@ -69,6 +89,7 @@ defmodule MidimeshEsp32.WiFi do
   end
 
   defp ap_started do
+    IO.puts("ORIGINAL AP STARTED")
   end
 
   defp sta_connected(_) do

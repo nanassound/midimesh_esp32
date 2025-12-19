@@ -26,6 +26,11 @@ defmodule MidimeshEsp32 do
   @knob_pins {0, 1, 2, 3, 4}
   # knob midi CC number in the same order as the pin
   @knob_midi_cc_number {75, 76, 77, 78, 79}
+  # knob identifier in the same order as the pin
+  @knob_ids {:slide_pot, :pot_1, :pot_2, :pot_3, :pot_4}
+  # knob rotation direction in the same order as the pin
+  # :cw = clockwise (normal), :ccw = counter-clockwise (inverted for PCB fix)
+  @knob_directions {:cw, :ccw, :ccw, :ccw, :ccw}
 
   # UDP Configuration
   # Broadcast it!
@@ -37,44 +42,43 @@ defmodule MidimeshEsp32 do
   @midi_channel 0
 
   def start() do
+    # Setup LED indicator pin
     GPIO.set_pin_mode(@led_pin, :output)
 
-    number_of_knobs = tuple_size(@knob_pins)
-    MidimeshEsp32.Knob.activate_knobs(@knob_pins, number_of_knobs)
+    # Start and opening UDP socket
+    udp_sender_pid = spawn(fn -> start_udp_sender() end)
 
-    number_of_switches = tuple_size(@switch_pins)
-    MidimeshEsp32.Switch.activate_switches(@switch_pins, number_of_switches)
+    # Give the UDP sender time to initialize
+    Process.sleep(100)
+
+    # Start and activate all knobs
+    MidimeshEsp32.Knob.activate_knobs(@knob_pins)
+
+    MidimeshEsp32.Knob.spawn_knobs_reading(
+      @knob_pins,
+      @knob_ids,
+      @knob_directions,
+      udp_sender_pid
+    )
+
+    # Start and activate all switches
+    MidimeshEsp32.Switch.activate_switches(@switch_pins)
 
     # Decide between AP mode or STA mode.
     # When the switch is ON, it should become AP mode
-    config =
-      case MidimeshEsp32.Switch.read_state(elem(@switch_pins, 0)) do
-        :low ->
-          {:ok, config} =
-            MidimeshEsp32.WiFi.get_config(:ap_mode,
-              ap_started: &ap_started/0
-            )
+    case MidimeshEsp32.Switch.read_state(elem(@switch_pins, 0)) do
+      :low ->
+        {:ok, config} =
+          MidimeshEsp32.WiFi.get_config(:ap_mode)
 
-          config
+        IO.puts("AP MODE CONFIG: #{inspect(config)}")
+        MidimeshEsp32.WiFi.wait_for_mode(:ap_mode, config, &ap_mode_callback/0)
 
-        :high ->
-          {:ok, config} =
-            MidimeshEsp32.WiFi.get_config(:sta_mode,
-              got_ip: &got_ip/1
-            )
+      :high ->
+        {:ok, config} =
+          MidimeshEsp32.WiFi.get_config(:sta_mode)
 
-          config
-      end
-
-    case :network.start(config) do
-      {:ok, network_pid} ->
-        # Wait the device to settle down with the network initialization
-        Process.sleep(5000)
-        IO.puts("Network PID: #{inspect(network_pid)}")
-
-      {:error, reason} ->
-        IO.puts("Failed to start network: #{inspect(reason)}")
-        {:error, reason}
+        MidimeshEsp32.WiFi.wait_for_mode(:sta_mode, config, &sta_mode_callback/1)
     end
 
     # Loop the main process forever
@@ -84,72 +88,28 @@ defmodule MidimeshEsp32 do
   # Since this MIDI controller works exclusively via WiFi
   # Then we will do everything after this device get IP address.
   # This is for STA mode
-  defp got_ip(ip_info) do
+  defp sta_mode_callback(ip_info) do
     IO.puts("Got IP: #{inspect(ip_info)}")
 
     # Start LED blinking in a separate process.
     # It acts as an indicator that this device successfully connected to the WiFi
     # and get an IP address
     spawn(fn -> blinking_led(@led_pin, :low) end)
-
-    # Start udp sender process
-    spawn(fn -> start_udp_sender() end)
   end
 
   # If the device in AP mode, we will start from here
-  defp ap_started do
-    # In AP mode, the led will constantly ON to give visual differentiation
-    GPIO.digital_write(@led_pin, :low)
-
-    # Start udp sender process
-    spawn(fn -> start_udp_sender() end)
+  defp ap_mode_callback do
+    spawn(fn -> blinking_led(@led_pin, :low, 5000) end)
   end
 
-  defp blinking_led(pin, level) do
+  defp blinking_led(pin, level, timer \\ 1000) do
     GPIO.digital_write(pin, level)
-    Process.sleep(1000)
-    blinking_led(pin, toggle(level))
+    Process.sleep(timer)
+    blinking_led(pin, toggle(level), timer)
   end
 
   defp toggle(:high), do: :low
   defp toggle(:low), do: :high
-
-  defp spawn_knobs_reading_process(_pins, 0, _socket), do: :ok
-
-  defp spawn_knobs_reading_process(pins, number_of_knobs, socket) when number_of_knobs > 0 do
-    current_knob_index = number_of_knobs - 1
-    knob_pin = elem(pins, current_knob_index)
-    cc_number = elem(@knob_midi_cc_number, current_knob_index)
-
-    spawn(fn -> read_knob(knob_pin, socket, nil, cc_number) end)
-
-    # Repeat until all knobs get a process
-    spawn_knobs_reading_process(pins, number_of_knobs - 1, socket)
-  end
-
-  defp read_knob(pin, socket, prev_cc_val, cc_number) do
-    knob_val = MidimeshEsp32.Knob.read_analog(pin)
-
-    current_cc_val =
-      case knob_val do
-        {:ok, {_, _, cc_val}} ->
-          # Only send if value changed
-          if cc_val != prev_cc_val do
-            status_byte = 0xB0 + @midi_channel
-            cc_data = <<status_byte, cc_number, cc_val>>
-            MidimeshEsp32.MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
-          end
-
-          cc_val
-
-        {:error, reason} ->
-          IO.puts("Error knob: #{inspect(reason)}")
-          prev_cc_val
-      end
-
-    Process.sleep(50)
-    read_knob(pin, socket, current_cc_val, cc_number)
-  end
 
   defp wait_forever do
     receive do
@@ -163,13 +123,32 @@ defmodule MidimeshEsp32 do
     case :gen_udp.open(0) do
       {:ok, socket} ->
         IO.puts("UDP socket opened successfully")
-
-        number_of_knobs = tuple_size(@knob_pins)
-
-        spawn_knobs_reading_process(@knob_pins, number_of_knobs, socket)
+        udp_sender_loop(socket)
 
       {:error, reason} ->
         IO.puts("Failed to open UDP socket: #{inspect(reason)}")
+    end
+  end
+
+  defp udp_sender_loop(socket) do
+    receive do
+      {:knob_value_with_index, knob_index, knob_id, knob_value} ->
+        IO.puts(
+          "Knob changed - Index: #{knob_index}, ID: #{knob_id}, Value: #{inspect(knob_value)}"
+        )
+
+        {_raw_value, _voltage, midi_value} = knob_value
+
+        status_byte = 0xB0 + @midi_channel
+        cc_number = elem(@knob_midi_cc_number, knob_index)
+        cc_data = <<status_byte, cc_number, midi_value>>
+        MidimeshEsp32.MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
+
+        udp_sender_loop(socket)
+
+      other ->
+        IO.puts("Received unexpected message: #{inspect(other)}")
+        udp_sender_loop(socket)
     end
   end
 end

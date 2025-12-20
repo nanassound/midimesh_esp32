@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 defmodule MidimeshEsp32 do
+  alias MidimeshEsp32.WiFi
+  alias MidimeshEsp32.Knob
+  alias MidimeshEsp32.MidiOps
+  alias MidimeshEsp32.Switch
+
   @compile {:no_warn_undefined, [GPIO]}
 
   # built-in LED
@@ -52,9 +57,9 @@ defmodule MidimeshEsp32 do
     Process.sleep(100)
 
     # Start and activate all knobs
-    MidimeshEsp32.Knob.activate_knobs(@knob_pins)
+    Knob.activate_knobs(@knob_pins)
 
-    MidimeshEsp32.Knob.spawn_knobs_reading(
+    Knob.spawn_knobs_reading(
       @knob_pins,
       @knob_ids,
       @knob_directions,
@@ -62,23 +67,23 @@ defmodule MidimeshEsp32 do
     )
 
     # Start and activate all switches
-    MidimeshEsp32.Switch.activate_switches(@switch_pins)
+    Switch.activate_switches(@switch_pins)
 
     # Decide between AP mode or STA mode.
     # When the switch is ON, it should become AP mode
     case MidimeshEsp32.Switch.read_state(elem(@switch_pins, 0)) do
       :low ->
         {:ok, config} =
-          MidimeshEsp32.WiFi.get_config(:ap_mode)
+          WiFi.get_config(:ap_mode)
 
         IO.puts("AP MODE CONFIG: #{inspect(config)}")
-        MidimeshEsp32.WiFi.wait_for_mode(:ap_mode, config, &ap_mode_callback/0)
+        WiFi.wait_for_mode(:ap_mode, config, &ap_mode_callback/0)
 
       :high ->
         {:ok, config} =
-          MidimeshEsp32.WiFi.get_config(:sta_mode)
+          WiFi.get_config(:sta_mode)
 
-        MidimeshEsp32.WiFi.wait_for_mode(:sta_mode, config, &sta_mode_callback/1)
+        WiFi.wait_for_mode(:sta_mode, config, &sta_mode_callback/1)
     end
 
     # Loop the main process forever
@@ -142,7 +147,7 @@ defmodule MidimeshEsp32 do
         status_byte = 0xB0 + @midi_channel
         cc_number = elem(@knob_midi_cc_number, knob_index)
         cc_data = <<status_byte, cc_number, midi_value>>
-        MidimeshEsp32.MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
+        MidiOps.send_midi(socket, cc_data, @udp_target_ip, @udp_target_port)
 
         udp_sender_loop(socket)
 

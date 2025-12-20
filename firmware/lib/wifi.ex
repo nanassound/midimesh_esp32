@@ -17,6 +17,7 @@ defmodule MidimeshEsp32.WiFi do
   @moduledoc """
   Various functions related to WiFi networking.
   """
+  alias MidimeshEsp32.Config
 
   @doc """
   Get the configuration for the device networking mode.
@@ -27,9 +28,9 @@ defmodule MidimeshEsp32.WiFi do
     {:ok,
      [
        # SSID name
-       ssid: MidimeshEsp32.Config.ssid_name(),
+       ssid: Config.ssid_name(),
        # SSID password
-       psk: MidimeshEsp32.Config.ssid_password()
+       psk: Config.ssid_password()
      ]}
   end
 
@@ -74,30 +75,5 @@ defmodule MidimeshEsp32.WiFi do
         IO.puts("Failed to start network: #{inspect(reason)}")
         {:error, reason}
     end
-  end
-
-  defp connected do
-    IO.puts("Connected to WiFi!")
-  end
-
-  defp got_ip(ip_info) do
-    IO.puts("Got IP: #{inspect(ip_info)}")
-  end
-
-  defp disconnected do
-    IO.puts("Disconnected from WiFi")
-  end
-
-  defp ap_started do
-    IO.puts("ORIGINAL AP STARTED")
-  end
-
-  defp sta_connected(_) do
-  end
-
-  defp sta_ip_assigned(_) do
-  end
-
-  defp sta_disconnected(_) do
   end
 end

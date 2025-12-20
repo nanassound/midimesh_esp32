@@ -5,6 +5,7 @@ Open-source modular MIDI devices ecosystem over WiFi using ESP32-C3 and AtomVM. 
 **Key Features:**
 - MIDI CC messages over UDP/WiFi
 - Concurrent multi-knob support with Elixir processes
+- Operational in AP mode or STA mode
 - Modular hardware designs (Eurorack-compatible)
 - Runs AtomVM (Erlang VM) on ESP32-C3
 
@@ -34,7 +35,7 @@ The firmware is written in Elixir and runs on [AtomVM](https://github.com/atomvm
 - Sends MIDI CC (Control Change) messages over UDP
 - LED indicator for WiFi connection status
 - Broadcasts to local network on port 4000
-- Modular architecture with separate modules for Knob, MIDI operations, and Config
+- Modular architecture with separate modules for Knob, Switch, MIDI operations, and Config
 
 **Hardware pins** (configurable in code):
 - Knob 1: GPIO 0

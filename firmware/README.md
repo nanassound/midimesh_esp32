@@ -10,12 +10,13 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 
 ## Features
 
-- Supports multiple analog potentiometers with concurrent processing (default: 2 knobs)
+- Supports multiple analog potentiometers with concurrent processing (default: 4 knobs and 1 fader)
 - Sends MIDI CC (Control Change) messages over UDP
-- Modular architecture with separate modules for Knob, MIDI operations, and Config
+- Modular architecture with separate modules for Knob, Switch, MIDI operations, and Config
 - LED indicator for WiFi connection status
 - Runs on ESP32-C3 with AtomVM
 - Broadcasts to local network on port 4000
+- It can be an access point by switching from a switch component
 
 ## Requirements
 
@@ -34,20 +35,23 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 ## Hardware Setup
 
 - **Potentiometers**: Connect analog potentiometers (tested with B10K) to:
-  - Knob 1: GPIO 0
-  - Knob 2: GPIO 1
+  - Slide potentiometer: GPIO 0
+  - Knob 1: GPIO 1
+  - Knob 2: GPIO 2
+  - Knob 3: GPIO 3
+  - Knob 4: GPIO 4
 - **LED**: Status LED on GPIO 8 (blinks when connected to WiFi)
+- **SWitch**: GPIO 10 for selecting AP/STA mode on booting
 
 ## Configuration
 
 ### WiFi Credentials
 
-1. Copy `lib/config_example.ex` to `lib/config.ex`
-2. Rename the module from `ConfigExample` to `MMConfig`
+1. Rename `lib/config.ex-example` to `lib/config.ex`
 3. Fill in your WiFi credentials:
 
 ```elixir
-defmodule MMConfig do
+defmodule MidimeshEsp32.Config do
   def ssid_name, do: "your_ssid"
   def ssid_password, do: "your_password"
 end
@@ -81,6 +85,12 @@ Edit `lib/midimesh_esp32.ex`:
 
 ## Build & Flash
 
+To flash AtomVM use this mix command and it will take care of the tooling.
+```bash
+mix atomvm.esp32.install
+```
+
+To flash the program, you use this mix command everytime you change the code. 
 ```bash
 mix atomvm.packbeam
 mix atomvm.esp32.flash --port /dev/tty.usbmodem1101 # Adjust with your actual port

@@ -8,6 +8,8 @@ MIDI controller over UDP network using AtomVM on ESP32-C3. This project is teste
 
 [Knob Control in Ableton Live](https://www.youtube.com/shorts/GX_Sy0ogvio)
 
+[Use AP mode to sync tempo and beat in Link-enabled apps between multiple devices](https://www.youtube.com/shorts/Eo4ck_zq9FM)
+
 ## Features
 
 - Supports multiple analog potentiometers with concurrent processing (default: 4 knobs and 1 fader)

@@ -12,6 +12,7 @@ Open-source modular MIDI devices ecosystem over WiFi using ESP32-C3 and AtomVM. 
 **Demos:**
 - [Controlling Arturia Pigments](https://www.youtube.com/shorts/djaUUPquI_E)
 - [Knob Control in Ableton Live](https://www.youtube.com/shorts/GX_Sy0ogvio)
+- [Use AP mode to sync tempo and beat in Link-enabled apps between multiple devices](https://www.youtube.com/shorts/Eo4ck_zq9FM)
 
 ## Project Structure
 
@@ -50,6 +51,7 @@ The midiMESH ecosystem includes various Eurorack-compatible MIDI controller desi
 
 **Available Designs:**
 - **Slide & Twist**: Controller with knobs and slide potentiometer
+- **Control Voltage (coming soon)**: Wireless MIDI to CV for Eurorack modular synth
 
 **Design Files:**
 - KiCad v9.0 schematics and PCB layouts

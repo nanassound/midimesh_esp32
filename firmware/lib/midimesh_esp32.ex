@@ -66,23 +66,26 @@ defmodule MidimeshEsp32 do
       udp_sender_pid
     )
 
-    # Start and activate all switches
-    Switch.activate_switches(@switch_pins)
+    # Start switch state machine
+    # The switch will continuously monitor its position and restart
+    # the device if the position changes from the boot state
+    switch_pin = elem(@switch_pins, 0)
+    {:ok, switch_pid} = Switch.start_link(pin: switch_pin)
 
-    # Decide between AP mode or STA mode.
-    # When the switch is ON, it should become AP mode
-    case MidimeshEsp32.Switch.read_state(elem(@switch_pins, 0)) do
-      :low ->
-        {:ok, config} =
-          WiFi.get_config(:ap_mode)
+    # Get initial state for WiFi mode selection
+    {:ok, initial_state} = Switch.get_state(switch_pid)
 
+    # Decide between AP mode or STA mode based on switch state
+    # When the switch is CLOSED (grounded), use AP mode
+    # When the switch is OPEN (not grounded), use STA mode
+    case initial_state do
+      :switch_closed ->
+        {:ok, config} = WiFi.get_config(:ap_mode)
         IO.puts("AP MODE CONFIG: #{inspect(config)}")
         WiFi.wait_for_mode(:ap_mode, config, &ap_mode_callback/0)
 
-      :high ->
-        {:ok, config} =
-          WiFi.get_config(:sta_mode)
-
+      :switch_open ->
+        {:ok, config} = WiFi.get_config(:sta_mode)
         WiFi.wait_for_mode(:sta_mode, config, &sta_mode_callback/1)
     end
 

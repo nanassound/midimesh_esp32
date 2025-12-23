@@ -119,26 +119,14 @@ defmodule MidimeshEsp32.Switch do
     IO.puts("Initial GPIO reading: #{gpio_level}")
     IO.puts("Boot state: #{boot_state}")
     IO.puts("Monitoring will begin - device will restart if switch changes from boot position")
-    IO.puts("=========================================\n")
 
     data = %{
       pin: pin,
-      boot_state: boot_state,
-      poll_timer_ref: nil
+      boot_state: boot_state
     }
 
     # Start in boot_state, schedule first poll after 150ms
     {:ok, boot_state, data, [{:state_timeout, 150, :poll}]}
-  end
-
-  @doc false
-  @impl :gen_statem
-  def terminate(reason, state, _data) do
-    IO.puts("\n=== Switch State Machine Terminating ===")
-    IO.puts("Reason: #{reason}")
-    IO.puts("Final state: #{state}")
-    IO.puts("========================================\n")
-    :ok
   end
 
   # State functions
@@ -152,7 +140,8 @@ defmodule MidimeshEsp32.Switch do
 
     case current_gpio do
       :high ->
-        {:keep_state_and_data, [{:state_timeout, 150, :poll}]}
+        # Stay in switch_open state, schedule next poll
+        {:next_state, :switch_open, data, [{:state_timeout, 150, :poll}]}
 
       :low ->
         IO.puts("[switch_open] State change detected: GPIO changed from :high to :low")
@@ -161,12 +150,12 @@ defmodule MidimeshEsp32.Switch do
   end
 
   # Handle API calls
-  def switch_open({:call, from}, :get_state, _data) do
-    {:keep_state_and_data, [{:reply, from, {:ok, :switch_open}}]}
+  def switch_open({:call, from}, :get_state, data) do
+    {:next_state, :switch_open, data, [{:reply, from, {:ok, :switch_open}}]}
   end
 
   def switch_open({:call, from}, :get_boot_state, data) do
-    {:keep_state_and_data, [{:reply, from, {:ok, data.boot_state}}]}
+    {:next_state, :switch_open, data, [{:reply, from, {:ok, data.boot_state}}]}
   end
 
   @doc false
@@ -178,7 +167,8 @@ defmodule MidimeshEsp32.Switch do
 
     case current_gpio do
       :low ->
-        {:keep_state_and_data, [{:state_timeout, 150, :poll}]}
+        # Stay in switch_closed state, schedule next poll
+        {:next_state, :switch_closed, data, [{:state_timeout, 150, :poll}]}
 
       :high ->
         IO.puts("[switch_closed] State change detected: GPIO changed from :low to :high")
@@ -187,12 +177,12 @@ defmodule MidimeshEsp32.Switch do
   end
 
   # Handle API calls
-  def switch_closed({:call, from}, :get_state, _data) do
-    {:keep_state_and_data, [{:reply, from, {:ok, :switch_closed}}]}
+  def switch_closed({:call, from}, :get_state, data) do
+    {:next_state, :switch_closed, data, [{:reply, from, {:ok, :switch_closed}}]}
   end
 
   def switch_closed({:call, from}, :get_boot_state, data) do
-    {:keep_state_and_data, [{:reply, from, {:ok, data.boot_state}}]}
+    {:next_state, :switch_closed, data, [{:reply, from, {:ok, data.boot_state}}]}
   end
 
   # Private helpers

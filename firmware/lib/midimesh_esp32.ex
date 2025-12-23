@@ -81,7 +81,6 @@ defmodule MidimeshEsp32 do
     case initial_state do
       :switch_closed ->
         {:ok, config} = WiFi.get_config(:ap_mode)
-        IO.puts("AP MODE CONFIG: #{inspect(config)}")
         WiFi.wait_for_mode(:ap_mode, config, &ap_mode_callback/0)
 
       :switch_open ->
